@@ -1,7 +1,7 @@
 import os
 import sys
 import logging
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from slugify import slugify
@@ -84,6 +84,8 @@ class AnonymousMessage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sender_name = db.Column(db.String(100), nullable=False)
     content = db.Column(db.Text, nullable=False)
+    response = db.Column(db.Text, nullable=True)
+    response_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_read = db.Column(db.Boolean, default=False)
 
@@ -245,7 +247,7 @@ def contact():
         app.logger.error(f"Error processing contact form: {str(e)}")
         return jsonify({'success': False, 'error': 'An error occurred. Please try again later.'}), 500
 
-@app.route('/chat', methods=['GET'])
+@app.route('/chat')
 def chat():
     messages = AnonymousMessage.query.order_by(AnonymousMessage.created_at.desc()).all()
     return render_template('chat.html', messages=messages)
@@ -296,6 +298,68 @@ def mark_read(message_id):
     message.is_read = True
     db.session.commit()
     return jsonify({'success': True})
+
+def is_admin():
+    return request.cookies.get('admin_token') == os.getenv('ADMIN_TOKEN')
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password == os.getenv('ADMIN_PASSWORD'):
+            response = make_response(redirect(url_for('chat')))
+            response.set_cookie('admin_token', os.getenv('ADMIN_TOKEN'))
+            return response
+        flash('Invalid password')
+    return render_template('admin_login.html')
+
+@app.route('/admin/logout')
+def admin_logout():
+    response = make_response(redirect(url_for('chat')))
+    response.delete_cookie('admin_token')
+    return response
+
+@app.route('/respond/<int:message_id>', methods=['POST'])
+def respond_to_message(message_id):
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    message = AnonymousMessage.query.get_or_404(message_id)
+    response_text = request.form.get('response')
+    
+    if not response_text:
+        return jsonify({'error': 'Response is required'}), 400
+        
+    message.response = response_text
+    message.response_at = datetime.utcnow()
+    db.session.commit()
+    
+    # Send email notification to the user if they provided an email
+    if message.sender_email:
+        msg = Message(
+            'Response to your message',
+            sender=app.config['MAIL_DEFAULT_SENDER'],
+            recipients=[message.sender_email]
+        )
+        msg.body = f'''Hi {message.sender_name},
+
+Rohith has responded to your message:
+
+Your message:
+{message.content}
+
+Response:
+{response_text}
+
+You can view the full conversation at: {request.host_url}chat
+'''
+        mail.send(msg)
+    
+    return jsonify({
+        'id': message.id,
+        'response': message.response,
+        'response_at': message.response_at.strftime('%Y-%m-%d %H:%M:%S')
+    })
 
 @app.context_processor
 def inject_recaptcha_site_key():

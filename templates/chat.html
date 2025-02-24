@@ -7,9 +7,16 @@
     <div class="row">
         <div class="col-md-8 mx-auto">
             <div class="card">
-                <div class="card-header bg-dark text-white">
-                    <h2 class="mb-0">Chat with Rohith</h2>
-                    <p class="mb-0"><small>Feel free to chat anonymously or leave your name!</small></p>
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="mb-0">Chat with Rohith</h2>
+                        <p class="mb-0"><small>Feel free to chat anonymously or leave your name!</small></p>
+                    </div>
+                    {% if request.cookies.get('admin_token') %}
+                        <a href="{{ url_for('admin_logout') }}" class="btn btn-outline-light btn-sm">Logout</a>
+                    {% else %}
+                        <a href="{{ url_for('admin_login') }}" class="btn btn-outline-light btn-sm">Admin</a>
+                    {% endif %}
                 </div>
                 <div class="card-body">
                     <div class="messages-container mb-4" id="messages">
@@ -22,6 +29,26 @@
                                 <div class="message-content">
                                     {{ message.content }}
                                 </div>
+                                {% if message.response %}
+                                    <div class="response-bubble mt-2">
+                                        <div class="response-header">
+                                            <strong>Rohith's Response</strong>
+                                            <small class="text-muted">{{ message.response_at.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                                        </div>
+                                        <div class="response-content">
+                                            {{ message.response }}
+                                        </div>
+                                    </div>
+                                {% elif request.cookies.get('admin_token') %}
+                                    <div class="response-form mt-2">
+                                        <form class="respond-form" data-message-id="{{ message.id }}">
+                                            <div class="input-group">
+                                                <textarea class="form-control" name="response" placeholder="Type your response..." required></textarea>
+                                                <button class="btn btn-primary" type="submit">Respond</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                {% endif %}
                             </div>
                         {% endfor %}
                     </div>
@@ -29,6 +56,9 @@
                     <form id="messageForm" class="message-form">
                         <div class="mb-3">
                             <input type="text" class="form-control" id="senderName" name="sender_name" placeholder="Your name (optional)">
+                        </div>
+                        <div class="mb-3">
+                            <input type="email" class="form-control" id="senderEmail" name="sender_email" placeholder="Your email (optional, for response notifications)">
                         </div>
                         <div class="mb-3">
                             <textarea class="form-control" id="messageContent" name="content" rows="3" placeholder="Type your message here..." required></textarea>
@@ -78,10 +108,42 @@
     white-space: pre-wrap;
 }
 
+.response-bubble {
+    background-color: #e3f2fd;
+    border-radius: 10px;
+    padding: 0.8rem;
+    margin-left: 1rem;
+    border-left: 3px solid #2196f3;
+}
+
+.response-header {
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9em;
+}
+
+.response-content {
+    white-space: pre-wrap;
+}
+
 .message-form {
     background-color: #fff;
     padding: 1rem;
     border-radius: 5px;
+}
+
+.response-form {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #dee2e6;
+}
+
+.response-form textarea {
+    font-size: 0.9em;
+    resize: vertical;
+    min-height: 60px;
 }
 </style>
 {% endblock %}
@@ -92,6 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const messageForm = document.getElementById('messageForm');
     const messagesContainer = document.getElementById('messages');
     
+    // Handle new messages
     messageForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -134,6 +197,48 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error:', error);
             alert('An error occurred while sending the message');
         }
+    });
+
+    // Handle admin responses
+    document.querySelectorAll('.respond-form').forEach(form => {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const messageId = this.dataset.messageId;
+            const formData = new FormData(this);
+            
+            try {
+                const response = await fetch(`/respond/${messageId}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Create response element
+                    const responseDiv = document.createElement('div');
+                    responseDiv.className = 'response-bubble mt-2';
+                    responseDiv.innerHTML = `
+                        <div class="response-header">
+                            <strong>Rohith's Response</strong>
+                            <small class="text-muted">${data.response_at}</small>
+                        </div>
+                        <div class="response-content">
+                            ${data.response}
+                        </div>
+                    `;
+                    
+                    // Replace the form with the response
+                    this.parentElement.replaceWith(responseDiv);
+                } else {
+                    alert(data.error || 'Failed to send response');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while sending the response');
+            }
+        });
     });
 });
 </script>

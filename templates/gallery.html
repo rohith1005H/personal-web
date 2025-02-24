@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Photo Gallery{% endblock %}
+
+{% block content %}
+<h1>Photo Gallery</h1>
+
+{% if photos %}
+    <div class="row">
+        {% for photo in photos %}
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    <img src="{{ url_for('static', filename='uploads/' + photo.filename) }}" 
+                         class="card-img-top" 
+                         alt="{{ photo.description }}">
+                    <div class="card-body">
+                        <p class="card-text">{{ photo.description }}</p>
+                        <p class="text-muted">{{ photo.uploaded_at.strftime('%B %d, %Y') }}</p>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>No photos yet. Why not <a href="{{ url_for('upload') }}">upload some</a>?</p>
+{% endif %}
+{% endblock %}

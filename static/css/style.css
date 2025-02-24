@@ -1,0 +1,61 @@
+/* General Styles */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.container {
+    flex: 1;
+}
+
+/* Navigation */
+.navbar {
+    margin-bottom: 2rem;
+}
+
+/* Footer */
+.footer {
+    margin-top: auto;
+    background-color: #343a40;
+    color: white;
+}
+
+.social-links a {
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.social-links a:hover {
+    color: #007bff !important;
+}
+
+/* Blog Posts */
+.blog-post {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.post-content {
+    line-height: 1.8;
+    font-size: 1.1rem;
+}
+
+/* Gallery */
+.card img {
+    height: 200px;
+    object-fit: cover;
+}
+
+/* Forms */
+.form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .card img {
+        height: 150px;
+    }
+}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Blog Posts{% endblock %}
+
+{% block content %}
+<h1>Blog Posts</h1>
+
+{% if posts %}
+    <div class="row">
+        {% for post in posts %}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h2 class="card-title">{{ post.title }}</h2>
+                        <p class="text-muted">{{ post.created_at.strftime('%B %d, %Y') }}</p>
+                        <a href="{{ url_for('post', slug=post.slug) }}" class="btn btn-primary">Read More</a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>No posts yet. Why not <a href="{{ url_for('write') }}">write one</a>?</p>
+{% endif %}
+{% endblock %}

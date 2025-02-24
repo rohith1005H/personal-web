@@ -339,7 +339,10 @@ def respond_to_message(message_id):
 def admin_login():
     if request.method == 'POST':
         password = request.form.get('password')
-        if password == os.getenv('ADMIN_PASSWORD'):
+        expected_password = os.getenv('ADMIN_PASSWORD')
+        app.logger.info(f"Login attempt. Expected: {expected_password}, Received: {password}")
+        
+        if password == expected_password:
             response = make_response(redirect(url_for('chat')))
             response.set_cookie('admin_token', os.getenv('ADMIN_TOKEN'))
             return response
@@ -352,12 +355,15 @@ def admin_logout():
     response.delete_cookie('admin_token')
     return response
 
+def is_admin():
+    expected_token = os.getenv('ADMIN_TOKEN')
+    received_token = request.cookies.get('admin_token')
+    app.logger.info(f"Admin check. Expected: {expected_token}, Received: {received_token}")
+    return received_token == expected_token
+
 @app.context_processor
 def inject_recaptcha_site_key():
     return dict(recaptcha_site_key=app.config['RECAPTCHA_SITE_KEY'])
-
-def is_admin():
-    return request.cookies.get('admin_token') == os.getenv('ADMIN_TOKEN')
 
 if __name__ == '__main__':
     app.run(debug=True)

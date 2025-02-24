@@ -3,12 +3,13 @@ import sys
 import logging
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response
 from flask_sqlalchemy import SQLAlchemy
+from flask_mail import Mail, Message
+from flask_migrate import Migrate
 from datetime import datetime
 from slugify import slugify
 import markdown2
 from werkzeug.utils import secure_filename
 from flask_wtf.csrf import CSRFProtect
-from flask_mail import Mail, Message
 import requests
 from dotenv import load_dotenv
 from whitenoise import WhiteNoise
@@ -48,6 +49,7 @@ app.config['RECAPTCHA_SECRET_KEY'] = os.getenv('RECAPTCHA_SECRET_KEY')
 
 # Initialize extensions
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 csrf = CSRFProtect(app)
 mail = Mail(app)
 
@@ -82,6 +84,7 @@ class Message(db.Model):
 class AnonymousMessage(db.Model):
     __tablename__ = 'anonymous_message'
     id = db.Column(db.Integer, primary_key=True)
+    chat_id = db.Column(db.String(64), nullable=False, index=True)  # Unique ID for each chat thread
     sender_name = db.Column(db.String(100), nullable=False)
     content = db.Column(db.Text, nullable=False)
     response = db.Column(db.Text, nullable=True)
@@ -249,13 +252,41 @@ def contact():
 
 @app.route('/chat')
 def chat():
-    messages = AnonymousMessage.query.order_by(AnonymousMessage.created_at.desc()).all()
-    return render_template('chat.html', messages=messages)
+    if is_admin():
+        # Admin sees list of all chats
+        chats = db.session.query(
+            AnonymousMessage.chat_id,
+            AnonymousMessage.sender_name,
+            db.func.count(AnonymousMessage.id).label('message_count'),
+            db.func.max(AnonymousMessage.created_at).label('last_message')
+        ).group_by(AnonymousMessage.chat_id, AnonymousMessage.sender_name).all()
+        return render_template('admin_chats.html', chats=chats)
+    return render_template('chat.html')
+
+@app.route('/chat/<chat_id>')
+def view_chat(chat_id):
+    if not is_admin():
+        return redirect(url_for('chat'))
+    messages = AnonymousMessage.query.filter_by(chat_id=chat_id).order_by(AnonymousMessage.created_at).all()
+    return render_template('chat.html', messages=messages, chat_id=chat_id)
+
+@app.route('/api/messages/<chat_id>')
+def get_messages(chat_id):
+    messages = AnonymousMessage.query.filter_by(chat_id=chat_id).order_by(AnonymousMessage.created_at).all()
+    return jsonify([{
+        'id': msg.id,
+        'sender_name': msg.sender_name,
+        'content': msg.content,
+        'response': msg.response,
+        'response_at': msg.response_at.strftime('%Y-%m-%d %H:%M:%S') if msg.response_at else None,
+        'created_at': msg.created_at.strftime('%Y-%m-%d %H:%M:%S')
+    } for msg in messages])
 
 @app.route('/send_message', methods=['POST'])
 def send_message():
     try:
         data = request.form
+        chat_id = data.get('chat_id')
         sender_name = data.get('sender_name', 'Anonymous')
         content = data.get('content')
         
@@ -263,28 +294,16 @@ def send_message():
             return jsonify({'error': 'Message content is required'}), 400
             
         message = AnonymousMessage(
+            chat_id=chat_id,
             sender_name=sender_name,
             content=content
         )
         db.session.add(message)
         db.session.commit()
         
-        # Send email notification
-        msg = Message(
-            'New Anonymous Message',
-            sender=app.config['MAIL_DEFAULT_SENDER'],
-            recipients=[app.config['MAIL_USERNAME']]
-        )
-        msg.body = f'''New message from {sender_name}:
-
-{content}
-
-View all messages at: {request.host_url}chat
-'''
-        mail.send(msg)
-        
         return jsonify({
             'id': message.id,
+            'chat_id': message.chat_id,
             'sender_name': message.sender_name,
             'content': message.content,
             'created_at': message.created_at.strftime('%Y-%m-%d %H:%M:%S')
@@ -292,12 +311,26 @@ View all messages at: {request.host_url}chat
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/mark_read/<int:message_id>', methods=['POST'])
-def mark_read(message_id):
+@app.route('/respond/<int:message_id>', methods=['POST'])
+def respond_to_message(message_id):
+    if not is_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+        
     message = AnonymousMessage.query.get_or_404(message_id)
-    message.is_read = True
+    response_text = request.form.get('response')
+    
+    if not response_text:
+        return jsonify({'error': 'Response is required'}), 400
+        
+    message.response = response_text
+    message.response_at = datetime.utcnow()
     db.session.commit()
-    return jsonify({'success': True})
+    
+    return jsonify({
+        'id': message.id,
+        'response': message.response,
+        'response_at': message.response_at.strftime('%Y-%m-%d %H:%M:%S')
+    })
 
 def is_admin():
     return request.cookies.get('admin_token') == os.getenv('ADMIN_TOKEN')
@@ -318,48 +351,6 @@ def admin_logout():
     response = make_response(redirect(url_for('chat')))
     response.delete_cookie('admin_token')
     return response
-
-@app.route('/respond/<int:message_id>', methods=['POST'])
-def respond_to_message(message_id):
-    if not is_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-        
-    message = AnonymousMessage.query.get_or_404(message_id)
-    response_text = request.form.get('response')
-    
-    if not response_text:
-        return jsonify({'error': 'Response is required'}), 400
-        
-    message.response = response_text
-    message.response_at = datetime.utcnow()
-    db.session.commit()
-    
-    # Send email notification to the user if they provided an email
-    if message.sender_email:
-        msg = Message(
-            'Response to your message',
-            sender=app.config['MAIL_DEFAULT_SENDER'],
-            recipients=[message.sender_email]
-        )
-        msg.body = f'''Hi {message.sender_name},
-
-Rohith has responded to your message:
-
-Your message:
-{message.content}
-
-Response:
-{response_text}
-
-You can view the full conversation at: {request.host_url}chat
-'''
-        mail.send(msg)
-    
-    return jsonify({
-        'id': message.id,
-        'response': message.response,
-        'response_at': message.response_at.strftime('%Y-%m-%d %H:%M:%S')
-    })
 
 @app.context_processor
 def inject_recaptcha_site_key():

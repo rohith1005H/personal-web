@@ -21,7 +21,7 @@
                 <div class="card-body">
                     <div class="messages-container mb-4" id="messages">
                         {% for message in messages %}
-                            <div class="message-bubble mb-3 {% if message.is_read %}read{% endif %}" data-message-id="{{ message.id }}">
+                            <div class="message-bubble mb-3" data-message-id="{{ message.id }}">
                                 <div class="message-header">
                                     <strong>{{ message.sender_name }}</strong>
                                     <small class="text-muted">{{ message.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</small>
@@ -58,9 +58,6 @@
                             <input type="text" class="form-control" id="senderName" name="sender_name" placeholder="Your name (optional)">
                         </div>
                         <div class="mb-3">
-                            <input type="email" class="form-control" id="senderEmail" name="sender_email" placeholder="Your email (optional, for response notifications)">
-                        </div>
-                        <div class="mb-3">
                             <textarea class="form-control" id="messageContent" name="content" rows="3" placeholder="Type your message here..." required></textarea>
                         </div>
                         <button type="submit" class="btn btn-primary">Send Message</button>
@@ -91,10 +88,6 @@
     padding: 1rem;
     margin-bottom: 1rem;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-.message-bubble.read {
-    opacity: 0.8;
 }
 
 .message-header {
@@ -151,14 +144,85 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Generate or get existing chat ID
+    let chatId = localStorage.getItem('chat_id');
+    if (!chatId) {
+        chatId = 'chat_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('chat_id', chatId);
+    }
+
+    // Remember user's name
+    const senderNameInput = document.getElementById('senderName');
+    const savedName = localStorage.getItem('sender_name');
+    if (savedName) {
+        senderNameInput.value = savedName;
+    }
+    
     const messageForm = document.getElementById('messageForm');
     const messagesContainer = document.getElementById('messages');
+    
+    // Load chat history
+    async function loadMessages() {
+        try {
+            const response = await fetch(`/api/messages/${chatId}`);
+            const messages = await response.json();
+            
+            messagesContainer.innerHTML = '';
+            messages.forEach(message => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message-bubble mb-3';
+                messageDiv.dataset.messageId = message.id;
+                
+                let html = `
+                    <div class="message-header">
+                        <strong>${message.sender_name}</strong>
+                        <small class="text-muted">${message.created_at}</small>
+                    </div>
+                    <div class="message-content">
+                        ${message.content}
+                    </div>
+                `;
+                
+                if (message.response) {
+                    html += `
+                        <div class="response-bubble mt-2">
+                            <div class="response-header">
+                                <strong>Rohith's Response</strong>
+                                <small class="text-muted">${message.response_at}</small>
+                            </div>
+                            <div class="response-content">
+                                ${message.response}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                messageDiv.innerHTML = html;
+                messagesContainer.appendChild(messageDiv);
+            });
+            
+            // Scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        } catch (error) {
+            console.error('Error loading messages:', error);
+        }
+    }
+    
+    // Load initial messages
+    loadMessages();
     
     // Handle new messages
     messageForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
         const formData = new FormData(messageForm);
+        formData.append('chat_id', chatId);
+        
+        // Save name for future use
+        const senderName = formData.get('sender_name');
+        if (senderName) {
+            localStorage.setItem('sender_name', senderName);
+        }
         
         try {
             const response = await fetch('/send_message', {
@@ -166,31 +230,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: formData
             });
             
-            const data = await response.json();
-            
             if (response.ok) {
-                // Create new message element
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message-bubble mb-3';
-                messageDiv.innerHTML = `
-                    <div class="message-header">
-                        <strong>${data.sender_name}</strong>
-                        <small class="text-muted">${data.created_at}</small>
-                    </div>
-                    <div class="message-content">
-                        ${data.content}
-                    </div>
-                `;
-                
-                // Add to messages container
-                messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
-                
-                // Clear form
+                // Clear form and reload messages
                 messageForm.reset();
-                
-                // Scroll to latest message
-                messagesContainer.scrollTop = 0;
+                if (savedName) {
+                    senderNameInput.value = savedName;
+                }
+                loadMessages();
             } else {
+                const data = await response.json();
                 alert(data.error || 'Failed to send message');
             }
         } catch (error) {
@@ -213,25 +261,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: formData
                 });
                 
-                const data = await response.json();
-                
                 if (response.ok) {
-                    // Create response element
-                    const responseDiv = document.createElement('div');
-                    responseDiv.className = 'response-bubble mt-2';
-                    responseDiv.innerHTML = `
-                        <div class="response-header">
-                            <strong>Rohith's Response</strong>
-                            <small class="text-muted">${data.response_at}</small>
-                        </div>
-                        <div class="response-content">
-                            ${data.response}
-                        </div>
-                    `;
-                    
-                    // Replace the form with the response
-                    this.parentElement.replaceWith(responseDiv);
+                    loadMessages();
                 } else {
+                    const data = await response.json();
                     alert(data.error || 'Failed to send response');
                 }
             } catch (error) {
@@ -240,6 +273,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Periodically check for new messages
+    setInterval(loadMessages, 10000);
 });
 </script>
 {% endblock %}

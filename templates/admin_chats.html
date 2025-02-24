@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Chats{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h2 class="mb-0">Chat Conversations</h2>
+                    <a href="{{ url_for('admin_logout') }}" class="btn btn-outline-light btn-sm">Logout</a>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for chat in chats %}
+                            <a href="{{ url_for('view_chat', chat_id=chat.chat_id) }}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">{{ chat.sender_name }}</h5>
+                                    <small class="text-muted">{{ chat.last_message.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                                </div>
+                                <p class="mb-1">{{ chat.message_count }} messages</p>
+                            </a>
+                        {% else %}
+                            <div class="text-center p-4">
+                                <p class="mb-0">No chat conversations yet.</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

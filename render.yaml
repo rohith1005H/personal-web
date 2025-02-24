@@ -12,7 +12,7 @@ services:
       - key: DATABASE_URL
         value: sqlite:///blog.db
       - key: ADMIN_PASSWORD
-        value: MySecureAdminPass123
+        value: basDingshitter#2142$$
       - key: ADMIN_TOKEN
         value: dd569d0d1e0926a49dba1409f4ccf54179c36ddfa6aadf08b877d447b662bce7
     disk:

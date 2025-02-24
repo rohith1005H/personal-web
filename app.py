@@ -9,6 +9,7 @@ from flask_wtf.csrf import CSRFProtect
 from flask_mail import Mail, Message
 import requests
 from dotenv import load_dotenv
+from whitenoise import WhiteNoise
 
 load_dotenv()
 
@@ -29,6 +30,15 @@ app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
 # reCAPTCHA configuration
 app.config['RECAPTCHA_SITE_KEY'] = os.getenv('RECAPTCHA_SITE_KEY')
 app.config['RECAPTCHA_SECRET_KEY'] = os.getenv('RECAPTCHA_SECRET_KEY')
+
+# Wrap app with WhiteNoise for static file handling
+app.wsgi_app = WhiteNoise(
+    app.wsgi_app,
+    root=os.path.join(os.path.dirname(__file__), "static"),
+    prefix="static/",
+    index_file=True,
+    autorefresh=True
+)
 
 # Initialize extensions
 db = SQLAlchemy(app)

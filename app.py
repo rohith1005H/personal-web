@@ -23,39 +23,65 @@ logging.basicConfig(
 
 load_dotenv()
 
-app = Flask(__name__)
-
-# Database configuration
-db_path = os.getenv('DATABASE_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'blog.db'))
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Other configurations
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-
-# Email configuration
-app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
-app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
-
-# reCAPTCHA configuration
-app.config['RECAPTCHA_SITE_KEY'] = os.getenv('RECAPTCHA_SITE_KEY')
-app.config['RECAPTCHA_SECRET_KEY'] = os.getenv('RECAPTCHA_SECRET_KEY')
-
 # Initialize extensions
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-csrf = CSRFProtect(app)
-mail = Mail(app)
+csrf = CSRFProtect()
+db = SQLAlchemy()
+migrate = Migrate()
+mail = Mail()
+
+def create_app():
+    app = Flask(__name__)
+    
+    # Load environment variables
+    load_dotenv()
+    
+    # Configure app
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
+    db_path = os.getenv('DATABASE_PATH', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'blog.db'))
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+    app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+    app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+    app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER')
+    app.config['RECAPTCHA_SITE_KEY'] = os.getenv('RECAPTCHA_SITE_KEY')
+    app.config['RECAPTCHA_SECRET_KEY'] = os.getenv('RECAPTCHA_SECRET_KEY')
+    app.config['UPLOAD_FOLDER'] = 'static/uploads'
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+    
+    # Initialize extensions with app
+    csrf.init_app(app)
+    db.init_app(app)
+    migrate.init_app(app, db)
+    mail.init_app(app)
+    
+    return app
+
+app = create_app()
 
 # Ensure upload directory exists
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-app.logger.info(f"Upload directory created at {app.config['UPLOAD_FOLDER']}")
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.logger.info(f"Upload directory created at {UPLOAD_FOLDER}")
+
+# Ensure database directory exists
+DB_DIR = os.path.dirname(os.path.abspath(__file__))
+os.makedirs(DB_DIR, exist_ok=True)
+app.logger.info(f"Database directory ensured at {DB_DIR}")
+
+# Create database tables
+with app.app_context():
+    try:
+        db.create_all()
+        app.logger.info("Database tables created successfully")
+    except Exception as e:
+        app.logger.error(f"Error initializing database: {str(e)}")
+        app.logger.error("Failed to initialize database")
+
+# Add whitenoise for static files
+app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/')
 
 class Post(db.Model):
     __tablename__ = 'post'
@@ -91,44 +117,6 @@ class AnonymousMessage(db.Model):
     response_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_read = db.Column(db.Boolean, default=False)
-
-def init_db():
-    """Initialize the database and create all tables"""
-    try:
-        # Ensure the database directory exists
-        db_dir = os.path.dirname(db_path)
-        os.makedirs(db_dir, exist_ok=True)
-        app.logger.info(f"Database directory ensured at {db_dir}")
-        
-        # Create all tables
-        with app.app_context():
-            db.create_all()
-            app.logger.info("Database tables created successfully")
-            
-            # Verify tables were created
-            tables = db.engine.table_names()
-            app.logger.info(f"Created tables: {', '.join(tables)}")
-            
-        return True
-    except Exception as e:
-        app.logger.error(f"Error initializing database: {str(e)}")
-        return False
-
-# Initialize database
-if init_db():
-    app.logger.info("Database initialization completed successfully")
-else:
-    app.logger.error("Failed to initialize database")
-
-def verify_recaptcha(response):
-    """Verify reCAPTCHA response"""
-    verify_url = 'https://www.google.com/recaptcha/api/siteverify'
-    payload = {
-        'secret': app.config['RECAPTCHA_SECRET_KEY'],
-        'response': response
-    }
-    response = requests.post(verify_url, data=payload)
-    return response.json().get('success', False)
 
 @app.route('/')
 def index():
@@ -364,6 +352,16 @@ def is_admin():
 @app.context_processor
 def inject_recaptcha_site_key():
     return dict(recaptcha_site_key=app.config['RECAPTCHA_SITE_KEY'])
+
+def verify_recaptcha(response):
+    """Verify reCAPTCHA response"""
+    verify_url = 'https://www.google.com/recaptcha/api/siteverify'
+    payload = {
+        'secret': app.config['RECAPTCHA_SECRET_KEY'],
+        'response': response
+    }
+    response = requests.post(verify_url, data=payload)
+    return response.json().get('success', False)
 
 if __name__ == '__main__':
     app.run(debug=True)

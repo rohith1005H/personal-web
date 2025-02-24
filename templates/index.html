@@ -1,47 +1,146 @@
 {% extends "base.html" %}
 
-{% block title %}Welcome to My Website{% endblock %}
+{% block title %}Rohith Katukojwala - Cybersecurity | ML | Development{% endblock %}
 
 {% block content %}
-<div class="jumbotron">
-    <h1 class="display-4">Welcome to My Personal Space</h1>
-    <p class="lead">This is where I share my thoughts, photos, and connect with others.</p>
-    <hr class="my-4">
+<div class="hero-section mb-5 text-center py-5 bg-dark text-white">
+    <h1 class="display-4">Rohith Katukojwala</h1>
+    <p class="lead">Cybersecurity | Machine Learning | Software Development</p>
+    <p class="font-italic">(and occasional caffeine-fueled ramblings)</p>
 </div>
 
 <div class="row">
     <div class="col-md-8">
-        <h2>Recent Blog Posts</h2>
-        {% if posts %}
-            {% for post in posts %}
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <h3 class="card-title">{{ post.title }}</h3>
-                        <p class="card-text text-muted">{{ post.created_at.strftime('%B %d, %Y') }}</p>
-                        <a href="{{ url_for('post', slug=post.slug) }}" class="btn btn-primary">Read More</a>
+        <div class="about-section mb-5">
+            <h2>About Me</h2>
+            <p class="lead">I am passionate about security, AI, and solving complex problems with code—sometimes creating new problems along the way. My work spans from cryptographic wizardry to training AI models without fancy libraries (because who needs <code>sklearn</code>, right?). I also enjoy poking around cybersecurity tools, breaking things (ethically, of course), and pretending I understand network security.</p>
+        </div>
+
+        <div class="expertise-section mb-5">
+            <h2>What You'll Find Here</h2>
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Cybersecurity & Cryptography</h5>
+                            <p class="card-text">PKI systems, OpenSSL, Crypto++, sandboxing, and how to make your own security nightmares.</p>
+                        </div>
                     </div>
                 </div>
-            {% endfor %}
-        {% else %}
-            <p>No posts yet.</p>
-        {% endif %}
-    </div>
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Machine Learning & AI</h5>
+                            <p class="card-text">Linear regression, decision trees, SVM, XGBoost, and other ML experiments that may or may not work.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Computer Vision</h5>
+                            <p class="card-text">Teaching computers to see things (without making them sentient… hopefully).</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Programming & Algorithms</h5>
+                            <p class="card-text">C++, Python, and the fine art of debugging for hours only to find a missing semicolon.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <div class="col-md-4">
-        <h2>Recent Photos</h2>
-        <div class="row">
-            {% if photos %}
-                {% for photo in photos %}
-                    <div class="col-6 mb-3">
-                        <img src="{{ url_for('static', filename='uploads/' + photo.filename) }}" 
-                             class="img-fluid rounded" 
-                             alt="{{ photo.description }}">
+        <div class="recent-posts mb-5">
+            <h2>Recent Blog Posts</h2>
+            {% if posts %}
+                {% for post in posts %}
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h3 class="card-title">{{ post.title }}</h3>
+                            <p class="card-text text-muted">{{ post.created_at.strftime('%B %d, %Y') }}</p>
+                            <a href="{{ url_for('post', slug=post.slug) }}" class="btn btn-primary">Read More</a>
+                        </div>
                     </div>
                 {% endfor %}
             {% else %}
-                <p>No photos yet.</p>
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Coming Soon!</h5>
+                        <p class="card-text">Stay tuned for upcoming posts about:</p>
+                        <ul>
+                            <li>Implementing Support Vector Machines from Scratch</li>
+                            <li>Traffic Sign Detection without Machine Learning</li>
+                            <li>Building a Sandbox for Secure Code Execution</li>
+                            <li>Cryptography with Crypto++: A Deep Dive</li>
+                            <li>Predicting Mohs Hardness Using Machine Learning</li>
+                        </ul>
+                    </div>
+                </div>
             {% endif %}
         </div>
     </div>
+
+    <div class="col-md-4">
+        <div class="connect-section mb-5">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="card-title">Connect with Me</h2>
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <a href="https://github.com/rohith1005H" target="_blank" class="text-dark">
+                                <i class="fab fa-github"></i> GitHub
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="https://www.linkedin.com/in/rohith-katukojwala" target="_blank" class="text-dark">
+                                <i class="fab fa-linkedin"></i> LinkedIn
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="https://instagram.com/rohithkatukojwala" target="_blank" class="text-dark">
+                                <i class="fab fa-instagram"></i> Instagram
+                            </a>
+                        </li>
+                        <li class="mb-2">
+                            <a href="mailto:rohithk1104@gmail.com" class="text-dark">
+                                <i class="fas fa-envelope"></i> Email
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="recent-photos mb-5">
+            <h2>Recent Photos</h2>
+            <div class="row">
+                {% if photos %}
+                    {% for photo in photos %}
+                        <div class="col-6 mb-3">
+                            <img src="{{ url_for('static', filename='uploads/' + photo.filename) }}" 
+                                 class="img-fluid rounded" 
+                                 alt="{{ photo.description }}">
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="col-12">
+                        <p class="text-muted">No photos uploaded yet.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 </div>
+
+<div class="text-center mt-5">
+    <p class="text-muted"><em>Stick around for more tech content, coding mishaps, and maybe some accidental wisdom!</em></p>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 {% endblock %}

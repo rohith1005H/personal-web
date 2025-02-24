@@ -271,6 +271,7 @@ def view_chat(chat_id):
     return render_template('chat.html', messages=messages, chat_id=chat_id)
 
 @app.route('/api/messages/<chat_id>')
+@csrf.exempt
 def get_messages(chat_id):
     messages = AnonymousMessage.query.filter_by(chat_id=chat_id).order_by(AnonymousMessage.created_at).all()
     return jsonify([{
@@ -283,6 +284,7 @@ def get_messages(chat_id):
     } for msg in messages])
 
 @app.route('/send_message', methods=['POST'])
+@csrf.exempt
 def send_message():
     try:
         data = request.form
@@ -312,6 +314,7 @@ def send_message():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/respond/<int:message_id>', methods=['POST'])
+@csrf.exempt
 def respond_to_message(message_id):
     if not is_admin():
         return jsonify({'error': 'Unauthorized'}), 401
@@ -332,10 +335,7 @@ def respond_to_message(message_id):
         'response_at': message.response_at.strftime('%Y-%m-%d %H:%M:%S')
     })
 
-def is_admin():
-    return request.cookies.get('admin_token') == os.getenv('ADMIN_TOKEN')
-
-@app.route('/admin/login', methods=['GET', 'POST'])
+@app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
         password = request.form.get('password')
@@ -343,10 +343,10 @@ def admin_login():
             response = make_response(redirect(url_for('chat')))
             response.set_cookie('admin_token', os.getenv('ADMIN_TOKEN'))
             return response
-        flash('Invalid password')
+        flash('Invalid password', 'error')
     return render_template('admin_login.html')
 
-@app.route('/admin/logout')
+@app.route('/admin_logout')
 def admin_logout():
     response = make_response(redirect(url_for('chat')))
     response.delete_cookie('admin_token')
@@ -355,6 +355,9 @@ def admin_logout():
 @app.context_processor
 def inject_recaptcha_site_key():
     return dict(recaptcha_site_key=app.config['RECAPTCHA_SITE_KEY'])
+
+def is_admin():
+    return request.cookies.get('admin_token') == os.getenv('ADMIN_TOKEN')
 
 if __name__ == '__main__':
     app.run(debug=True)

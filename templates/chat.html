@@ -42,6 +42,7 @@
                                 {% elif request.cookies.get('admin_token') %}
                                     <div class="response-form mt-2">
                                         <form class="respond-form" data-message-id="{{ message.id }}">
+                                            {{ csrf_token() }}
                                             <div class="input-group">
                                                 <textarea class="form-control" name="response" placeholder="Type your response..." required></textarea>
                                                 <button class="btn btn-primary" type="submit">Respond</button>
@@ -54,6 +55,7 @@
                     </div>
                     
                     <form id="messageForm" class="message-form">
+                        {{ csrf_token() }}
                         <div class="mb-3">
                             <input type="text" class="form-control" id="senderName" name="sender_name" placeholder="Your name (optional)">
                         </div>
@@ -144,6 +146,9 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Get CSRF token
+    const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+    
     // Generate or get existing chat ID
     let chatId = localStorage.getItem('chat_id');
     if (!chatId) {
@@ -164,7 +169,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load chat history
     async function loadMessages() {
         try {
-            const response = await fetch(`/api/messages/${chatId}`);
+            const response = await fetch(`/api/messages/${chatId}`, {
+                headers: {
+                    'X-CSRF-Token': csrfToken
+                }
+            });
             const messages = await response.json();
             
             messagesContainer.innerHTML = '';
@@ -227,6 +236,9 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch('/send_message', {
                 method: 'POST',
+                headers: {
+                    'X-CSRF-Token': csrfToken
+                },
                 body: formData
             });
             
@@ -258,6 +270,9 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const response = await fetch(`/respond/${messageId}`, {
                     method: 'POST',
+                    headers: {
+                        'X-CSRF-Token': csrfToken
+                    },
                     body: formData
                 });
                 

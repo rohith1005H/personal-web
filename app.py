@@ -79,6 +79,14 @@ class Message(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     read = db.Column(db.Boolean, default=False)
 
+class AnonymousMessage(db.Model):
+    __tablename__ = 'anonymous_message'
+    id = db.Column(db.Integer, primary_key=True)
+    sender_name = db.Column(db.String(100), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_read = db.Column(db.Boolean, default=False)
+
 def init_db():
     """Initialize the database and create all tables"""
     try:
@@ -236,6 +244,58 @@ def contact():
     except Exception as e:
         app.logger.error(f"Error processing contact form: {str(e)}")
         return jsonify({'success': False, 'error': 'An error occurred. Please try again later.'}), 500
+
+@app.route('/chat', methods=['GET'])
+def chat():
+    messages = AnonymousMessage.query.order_by(AnonymousMessage.created_at.desc()).all()
+    return render_template('chat.html', messages=messages)
+
+@app.route('/send_message', methods=['POST'])
+def send_message():
+    try:
+        data = request.form
+        sender_name = data.get('sender_name', 'Anonymous')
+        content = data.get('content')
+        
+        if not content:
+            return jsonify({'error': 'Message content is required'}), 400
+            
+        message = AnonymousMessage(
+            sender_name=sender_name,
+            content=content
+        )
+        db.session.add(message)
+        db.session.commit()
+        
+        # Send email notification
+        msg = Message(
+            'New Anonymous Message',
+            sender=app.config['MAIL_DEFAULT_SENDER'],
+            recipients=[app.config['MAIL_USERNAME']]
+        )
+        msg.body = f'''New message from {sender_name}:
+
+{content}
+
+View all messages at: {request.host_url}chat
+'''
+        mail.send(msg)
+        
+        return jsonify({
+            'id': message.id,
+            'sender_name': message.sender_name,
+            'content': message.content,
+            'created_at': message.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/mark_read/<int:message_id>', methods=['POST'])
+def mark_read(message_id):
+    message = AnonymousMessage.query.get_or_404(message_id)
+    message.is_read = True
+    db.session.commit()
+    return jsonify({'success': True})
 
 @app.context_processor
 def inject_recaptcha_site_key():
